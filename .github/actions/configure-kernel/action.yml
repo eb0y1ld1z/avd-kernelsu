@@ -1,5 +1,5 @@
 name: 'Configure Kernel Options'
-description: 'Force virtio drivers as built-in for AVD compatibility'
+description: 'AVD compatibility: keep virtio as modules (no forced built-ins)'
 
 inputs:
   kernel_version:
@@ -9,56 +9,14 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Create GKI fragment with built-in virtio drivers
+    - name: Create empty GKI fragment (virtio stays as modules)
       shell: bash
       run: |
         FRAG="${{ github.workspace }}/gki.fragment"
-
-        # Only add configs that exist in Kconfig - check before adding
         KERNEL_SRC="${{ github.workspace }}/kernel/common"
-        echo "# AVD virtio built-in configs" > "$FRAG"
-
-        # Check each config exists in Kconfig before adding to fragment
-        for cfg in \
-          CONFIG_VIRTIO \
-          CONFIG_VIRTIO_PCI \
-          CONFIG_VIRTIO_PCI_LEGACY \
-          CONFIG_VIRTIO_MMIO \
-          CONFIG_VIRTIO_BLK \
-          CONFIG_VIRTIO_NET \
-          CONFIG_VIRTIO_CONSOLE \
-          CONFIG_VIRTIO_INPUT \
-          CONFIG_VIRTIO_BALLOON \
-          CONFIG_VIRTIO_MEM \
-          CONFIG_DRM_VIRTIO_GPU \
-          CONFIG_HW_RANDOM_VIRTIO \
-          CONFIG_VIRTIO_DMA_SHARED_BUFFER \
-          CONFIG_SND_VIRTIO \
-          CONFIG_VIRTIO_VSOCKETS \
-          CONFIG_VIRTIO_VSOCKETS_COMMON \
-          CONFIG_GOLDFISH \
-          CONFIG_GOLDFISH_PIPE \
-          CONFIG_GOLDFISH_ADDRESS_SPACE \
-          CONFIG_DM_VERITY \
-          CONFIG_EROFS_FS \
-        ; do
-          # Strip CONFIG_ prefix to get Kconfig symbol name
-          SYM="${cfg#CONFIG_}"
-          if grep -rq "^config $SYM$" "$KERNEL_SRC" 2>/dev/null; then
-            echo "${cfg}=y" >> "$FRAG"
-            echo "  Added: ${cfg}=y"
-          else
-            echo "  Skipped (not in Kconfig): ${cfg}"
-          fi
-        done
-
-        echo "=== Final GKI Fragment ==="
-        cat "$FRAG"
-        echo "=========================="
-
-        # Copy to kernel arch config dirs
+        # virtio'yu =y zorlamiyoruz; GKI default'unda =m kalir, .ko uretilir,
+        # install-ksu-avd.sh ramdisk'i eslesen vermagic ile repack eder.
+        echo "# intentionally empty: build virtio as modules" > "$FRAG"
         for dir in "$KERNEL_SRC/arch/x86/configs" "$KERNEL_SRC/arch/arm64/configs"; do
-          if [ -d "$dir" ]; then
-            cp "$FRAG" "$dir/gki.fragment"
-          fi
+          [ -d "$dir" ] && cp "$FRAG" "$dir/gki.fragment"
         done
