@@ -1,5 +1,5 @@
 name: 'Configure Kernel Options'
-description: 'CFI permissive (stock modules) + KPM; virtio stays as modules'
+description: 'CFI disabled (stock modules load, no panic) + KPM; virtio stays as modules'
 
 inputs:
   kernel_version:
@@ -9,22 +9,24 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Create GKI fragment (CFI permissive + KPM)
+    - name: Create GKI fragment (CFI off + KPM)
       shell: bash
       run: |
         FRAG="${{ github.workspace }}/gki.fragment"
         KERNEL_SRC="${{ github.workspace }}/kernel/common"
-        echo "# AVD: CFI permissive so stock vendor/system modules don't panic" > "$FRAG"
-        # virtio'yu =y ZORLAMIYORUZ (modul kalir, .ko uretilir, ramdisk repack eder)
-        for cfg in CONFIG_CFI_PERMISSIVE CONFIG_KPM; do
-          SYM="${cfg#CONFIG_}"
-          if grep -rq "^config $SYM\$" "$KERNEL_SRC" 2>/dev/null; then
-            echo "${cfg}=y" >> "$FRAG"
-            echo "  Added: ${cfg}=y"
-          else
-            echo "  Skipped (not in Kconfig): ${cfg}"
-          fi
-        done
+        echo "# AVD: CFI kapali -> stock vendor/system modulleri panic atmadan yuklenir" > "$FRAG"
+        # CFI'yi TAMAMEN kapat (permissive yetmedi: 6588 ihlal boot'u felc ediyordu)
+        if grep -rq "^config CFI_CLANG\$" "$KERNEL_SRC" 2>/dev/null; then
+          echo "CONFIG_CFI_CLANG=n" >> "$FRAG"; echo "  Added: CONFIG_CFI_CLANG=n"
+        else
+          echo "  Skipped (not in Kconfig): CFI_CLANG"
+        fi
+        # KPM (SukiSU kernel patch module)
+        if grep -rq "^config KPM\$" "$KERNEL_SRC" 2>/dev/null; then
+          echo "CONFIG_KPM=y" >> "$FRAG"; echo "  Added: CONFIG_KPM=y"
+        else
+          echo "  Skipped (not in Kconfig): KPM"
+        fi
         echo "=== Final GKI Fragment ==="; cat "$FRAG"
         for dir in "$KERNEL_SRC/arch/x86/configs" "$KERNEL_SRC/arch/arm64/configs"; do
           [ -d "$dir" ] && cp "$FRAG" "$dir/gki.fragment"
