@@ -1,5 +1,5 @@
 name: 'Configure Kernel Options'
-description: 'CFI disabled (stock modules load, no panic) + KPM; virtio stays as modules'
+description: 'CFI permissive (safety net) + KPM; virtio stays as modules (ramdisk injection handles it)'
 
 inputs:
   kernel_version:
@@ -9,24 +9,22 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Create GKI fragment (CFI off + KPM)
+    - name: Create GKI fragment (CFI permissive + KPM)
       shell: bash
       run: |
         FRAG="${{ github.workspace }}/gki.fragment"
         KERNEL_SRC="${{ github.workspace }}/kernel/common"
-        echo "# AVD: CFI kapali -> stock moduller panic atmaz" > "$FRAG"
-        # CFI'yi kapat — kconfig 'is not set' sozdizimi (=n bazel dogrulamasini gecmez)
-        if grep -rq "^config CFI_CLANG\$" "$KERNEL_SRC" 2>/dev/null; then
-          echo "# CONFIG_CFI_CLANG is not set" >> "$FRAG"; echo "  Added: # CONFIG_CFI_CLANG is not set"
-        else
-          echo "  Skipped (not in Kconfig): CFI_CLANG"
-        fi
-        # KPM (=y dogru sekilde dogrulanir)
-        if grep -rq "^config KPM\$" "$KERNEL_SRC" 2>/dev/null; then
-          echo "CONFIG_KPM=y" >> "$FRAG"; echo "  Added: CONFIG_KPM=y"
-        else
-          echo "  Skipped (not in Kconfig): KPM"
-        fi
+        echo "# 6.6.30 build: CFI stock modullerle eslesir; permissive guvenlik agi" > "$FRAG"
+        # virtio'yu =y ZORLAMIYORUZ (modul kalir; ramdisk-injection + fstab yontemimiz hallediyor)
+        for cfg in CONFIG_CFI_PERMISSIVE CONFIG_KPM; do
+          SYM="${cfg#CONFIG_}"
+          if grep -rq "^config $SYM\$" "$KERNEL_SRC" 2>/dev/null; then
+            echo "${cfg}=y" >> "$FRAG"
+            echo "  Added: ${cfg}=y"
+          else
+            echo "  Skipped (not in Kconfig): ${cfg}"
+          fi
+        done
         echo "=== Final GKI Fragment ==="; cat "$FRAG"
         for dir in "$KERNEL_SRC/arch/x86/configs" "$KERNEL_SRC/arch/arm64/configs"; do
           [ -d "$dir" ] && cp "$FRAG" "$dir/gki.fragment"
