@@ -14,14 +14,14 @@ runs:
       run: |
         FRAG="${{ github.workspace }}/gki.fragment"
         KERNEL_SRC="${{ github.workspace }}/kernel/common"
-        echo "# AVD: CFI kapali -> stock vendor/system modulleri panic atmadan yuklenir" > "$FRAG"
-        # CFI'yi TAMAMEN kapat (permissive yetmedi: 6588 ihlal boot'u felc ediyordu)
+        echo "# AVD: CFI kapali -> stock moduller panic atmaz" > "$FRAG"
+        # CFI'yi kapat — kconfig 'is not set' sozdizimi (=n bazel dogrulamasini gecmez)
         if grep -rq "^config CFI_CLANG\$" "$KERNEL_SRC" 2>/dev/null; then
-          echo "CONFIG_CFI_CLANG=n" >> "$FRAG"; echo "  Added: CONFIG_CFI_CLANG=n"
+          echo "# CONFIG_CFI_CLANG is not set" >> "$FRAG"; echo "  Added: # CONFIG_CFI_CLANG is not set"
         else
           echo "  Skipped (not in Kconfig): CFI_CLANG"
         fi
-        # KPM (SukiSU kernel patch module)
+        # KPM (=y dogru sekilde dogrulanir)
         if grep -rq "^config KPM\$" "$KERNEL_SRC" 2>/dev/null; then
           echo "CONFIG_KPM=y" >> "$FRAG"; echo "  Added: CONFIG_KPM=y"
         else
