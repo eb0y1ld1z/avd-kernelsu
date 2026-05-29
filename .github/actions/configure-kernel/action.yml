@@ -1,5 +1,5 @@
 name: 'Configure Kernel Options'
-description: 'AVD compatibility: keep virtio as modules (no forced built-ins)'
+description: 'CFI permissive (stock modules) + KPM; virtio stays as modules'
 
 inputs:
   kernel_version:
@@ -9,14 +9,23 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Create empty GKI fragment (virtio stays as modules)
+    - name: Create GKI fragment (CFI permissive + KPM)
       shell: bash
       run: |
         FRAG="${{ github.workspace }}/gki.fragment"
         KERNEL_SRC="${{ github.workspace }}/kernel/common"
-        # virtio'yu =y zorlamiyoruz; GKI default'unda =m kalir, .ko uretilir,
-        # install-ksu-avd.sh ramdisk'i eslesen vermagic ile repack eder.
-        echo "# intentionally empty: build virtio as modules" > "$FRAG"
+        echo "# AVD: CFI permissive so stock vendor/system modules don't panic" > "$FRAG"
+        # virtio'yu =y ZORLAMIYORUZ (modul kalir, .ko uretilir, ramdisk repack eder)
+        for cfg in CONFIG_CFI_PERMISSIVE CONFIG_KPM; do
+          SYM="${cfg#CONFIG_}"
+          if grep -rq "^config $SYM\$" "$KERNEL_SRC" 2>/dev/null; then
+            echo "${cfg}=y" >> "$FRAG"
+            echo "  Added: ${cfg}=y"
+          else
+            echo "  Skipped (not in Kconfig): ${cfg}"
+          fi
+        done
+        echo "=== Final GKI Fragment ==="; cat "$FRAG"
         for dir in "$KERNEL_SRC/arch/x86/configs" "$KERNEL_SRC/arch/arm64/configs"; do
           [ -d "$dir" ] && cp "$FRAG" "$dir/gki.fragment"
         done
